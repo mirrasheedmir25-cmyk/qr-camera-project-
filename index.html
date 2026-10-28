@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>QR Camera Preview</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#141c31; --line:#2b3857; --text:#f3f6ff; --muted:#aab5d0; --accent:#6ee7b7; --danger:#fb7185; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:radial-gradient(circle at top,#1c2b4a,var(--bg) 58%); color:var(--text); padding:22px 14px 40px; }
+    main { width:min(760px,100%); margin:0 auto; }
+    header { text-align:center; margin:12px 0 22px; }
+    .eyebrow { color:var(--accent); font-weight:800; letter-spacing:.14em; text-transform:uppercase; font-size:.75rem; }
+    h1 { margin:8px 0; font-size:clamp(1.8rem,6vw,2.8rem); line-height:1.1; }
+    header p,.muted { color:var(--muted); line-height:1.55; }
+    .card { background:rgba(20,28,49,.94); border:1px solid var(--line); border-radius:20px; padding:18px; margin:14px 0; box-shadow:0 16px 40px #0002; }
+    h2 { margin:0 0 10px; font-size:1.15rem; }
+    label { display:block; color:var(--muted); font-size:.9rem; margin:12px 0 6px; }
+    input { width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); background:#0b1224; color:var(--text); font:inherit; }
+    .buttons { display:flex; flex-wrap:wrap; gap:10px; margin-top:13px; }
+    button { flex:1 1 150px; border:0; border-radius:12px; padding:13px 16px; font:inherit; font-weight:750; cursor:pointer; background:var(--accent); color:#072219; }
+    button.secondary { background:#273550; color:var(--text); border:1px solid #3a4a6c; }
+    button.danger { background:#4b2030; color:#ffdce2; border:1px solid #8a354b; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .status { border-radius:12px; background:#0b1224; border:1px solid var(--line); padding:12px 14px; margin-top:13px; color:var(--muted); overflow-wrap:anywhere; }
+    .status[data-kind="ok"] { color:var(--accent); }
+    .status[data-kind="error"] { color:#fda4af; }
+    .preview-wrap { overflow:hidden; border-radius:16px; background:#05070d; border:1px solid var(--line); aspect-ratio:4/3; display:grid; place-items:center; }
+    video { width:100%; height:100%; object-fit:cover; display:block; }
+    .placeholder { padding:22px; text-align:center; color:var(--muted); }
+    .privacy { font-size:.9rem; color:var(--muted); line-height:1.55; }
+    .qr { background:white; border-radius:12px; display:inline-flex; padding:12px; margin-top:12px; max-width:100%; }
+    .qr img { width:min(220px,60vw); height:auto; display:block; }
+    .small { font-size:.82rem; color:var(--muted); }
+    footer { text-align:center; font-size:.8rem; color:var(--muted); padding:12px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">HTML · CSS · JavaScript</div>
+    <h1>QR Camera Preview</h1>
+    <p>Scan the QR code to open this page, then choose whether to allow camera access.</p>
+  </header>
+
+  <section class="card">
+    <h2>1. Open this page by QR</h2>
+    <p class="muted">After publishing this page over HTTPS, paste its public URL here to create a QR code.</p>
+    <label for="pageUrl">Your published website URL</label>
+    <input id="pageUrl" type="url" placeholder="https://yourname.github.io/qr-camera-project/" autocomplete="url" />
+    <div class="buttons">
+      <button id="makeQr">Create QR Code</button>
+      <button id="copyUrl" class="secondary">Copy page URL</button>
+    </div>
+    <div id="qrArea" aria-live="polite"></div>
+    <p class="small">QR generation uses an online QR image service. Do not enter private or secret URLs.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Camera live preview</h2>
+    <p class="muted">Tap Start Camera. Your browser will ask for permission if needed.</p>
+    <div class="preview-wrap">
+      <video id="preview" autoplay playsinline muted hidden></video>
+      <div id="placeholder" class="placeholder">📷<br><br>Camera preview will appear here after permission is granted.</div>
+    </div>
+    <div class="buttons">
+      <button id="startCamera">Start Camera</button>
+      <button id="stopCamera" class="danger" disabled>Stop Camera</button>
+    </div>
+    <div id="status" class="status" role="status" aria-live="polite">Status: Camera is off.</div>
+    <p class="privacy">Privacy: this demo only displays the camera locally in this browser. It does not take photos, record video, or send camera footage to you or a server.</p>
+  </section>
+
+  <section class="card">
+    <h2>How to use on Android</h2>
+    <ol class="muted">
+      <li>Upload this file as <strong>index.html</strong> to a GitHub repository.</li>
+      <li>Enable GitHub Pages and wait for the HTTPS website URL.</li>
+      <li>Paste that URL above and tap <strong>Create QR Code</strong>.</li>
+      <li>Share the QR code. The other person scans it and chooses whether to allow camera access.</li>
+    </ol>
+    <p class="small">Camera access generally requires HTTPS or localhost. If permission was denied earlier, open the browser's site settings and change Camera permission.</p>
+  </section>
+  <footer>Camera starts only after a user action and browser permission.</footer>
+</main>
+
+<script>
+  const video = document.getElementById('preview');
+  const placeholder = document.getElementById('placeholder');
+  const statusBox = document.getElementById('status');
+  const startButton = document.getElementById('startCamera');
+  const stopButton = document.getElementById('stopCamera');
+  const pageUrlInput = document.getElementById('pageUrl');
+  const qrArea = document.getElementById('qrArea');
+  let activeStream = null;
+
+  function setStatus(message, kind = '') {
+    statusBox.textContent = message;
+    statusBox.dataset.kind = kind;
+  }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('Camera API is unavailable. Open this page using HTTPS in a supported browser.', 'error');
+      return;
+    }
+    if (activeStream) stopCamera();
+    startButton.disabled = true;
+    setStatus('Waiting for camera permission…');
+    try {
+      activeStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      video.srcObject = activeStream;
+      video.hidden = false;
+      placeholder.hidden = true;
+      await video.play();
+      stopButton.disabled = false;
+      setStatus('Camera is on. Live preview is shown only on this device.', 'ok');
+    } catch (error) {
+      activeStream = null;
+      video.srcObject = null;
+      video.hidden = true;
+      placeholder.hidden = false;
+      stopButton.disabled = true;
+      let message = 'Camera could not start.';
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        message = 'Permission was denied. Allow Camera in your browser site settings, then try again.';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        message = 'No camera was found on this device.';
+      } else if (error.name === 'NotReadableError') {
+        message = 'The camera may be in use by another app. Close it and try again.';
+      } else if (error.name === 'SecurityError') {
+        message = 'Camera access requires a secure HTTPS website or localhost.';
+      }
+      setStatus(message, 'error');
+    } finally {
+      startButton.disabled = false;
+    }
+  }
+
+  function stopCamera() {
+    if (activeStream) {
+      activeStream.getTracks().forEach(track => track.stop());
+      activeStream = null;
+    }
+    video.pause();
+    video.srcObject = null;
+    video.hidden = true;
+    placeholder.hidden = false;
+    stopButton.disabled = true;
+    setStatus('Camera is off.', '');
+  }
+
+  startButton.addEventListener('click', startCamera);
+  stopButton.addEventListener('click', stopCamera);
+  window.addEventListener('pagehide', stopCamera);
+
+  document.getElementById('makeQr').addEventListener('click', () => {
+    const url = pageUrlInput.value.trim();
+    let parsed;
+    try { parsed = new URL(url); } catch {
+      qrArea.textContent = 'Please enter a valid published HTTPS website URL first.';
+      return;
+    }
+    if (parsed.protocol !== 'https:') {
+      qrArea.textContent = 'Use your public HTTPS URL (for example, your GitHub Pages link).';
+      return;
+    }
+    const img = document.createElement('img');
+    img.alt = 'QR code for the published camera preview website';
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(parsed.href);
+    const wrap = document.createElement('div');
+    wrap.className = 'qr';
+    wrap.appendChild(img);
+    qrArea.replaceChildren();
+    const caption = document.createElement('p');
+    caption.className = 'small';
+    caption.textContent = 'Scan this QR code to open: ' + parsed.href;
+    qrArea.append(wrap, caption);
+  });
+
+  document.getElementById('copyUrl').addEventListener('click', async () => {
+    const url = pageUrlInput.value.trim() || location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus('Page URL copied.', 'ok');
+    } catch {
+      pageUrlInput.value = url;
+      pageUrlInput.focus();
+      pageUrlInput.select();
+      setStatus('Select and copy the URL from the field above.', '');
+    }
+  });
+
+  if (location.protocol === 'https:' && location.hostname !== 'localhost') {
+    pageUrlInput.value = location.href;
+  }
+</script>
+</body>
+</html>
